@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+        <body>
+            <canvas id="canvas" width="500" height="500" style="border:2px solid #000"></canvas>
+            <script>
+                var canvas = document.getElementById("canvas")
+var dibujo = canvas.getContext("2d")
+var inicio = null
+var fin = null
+
+function dot(x, y, dibujo) {
+    dibujo.fillRect(x, y, 5, 5);
+}
+
+function lineaPuntos(inicio, fin, dibujo) {
+    let x = inicio.x;
+    let y = inicio.y;
+    let dx = Math.abs(fin.x - inicio.x);
+    let dy = Math.abs(fin.y - inicio.y);
+    let sx = (inicio.x < fin.x) ? 1 : -1;
+    let sy = (inicio.y < fin.y) ? 1 : -1;
+
+    if (dx > dy) {
+        let err = dx / 2;
+        while (x !== fin.x) {
+            dot(x, y, dibujo);
+            err -= dy;
+            if (err < 0) {
+                y += sy;
+                err += dx;
+            }
+            x += sx;
+        }
+    } else {
+        let err = dy / 2;
+        while (y !== fin.y) {
+            dot(x, y, dibujo);
+            err -= dx;
+            if (err < 0) {
+                x += sx;
+                err += dy;
+            }
+            y += sy;
+        }
+    }
+
+    dot(fin.x, fin.y, dibujo);
+}
+
+canvas.addEventListener("click", function (event) {
+    var x = event.clientX - canvas.getBoundingClientRect().left;
+    var y = event.clientY - canvas.getBoundingClientRect().top;
+    console.log(inicio);
+    console.log(fin);
+
+    if (inicio === null) {
+        inicio = { x: x, y: y };
+    } else {
+        fin = { x: x, y: y };
+        lineaPuntos(inicio, fin, dibujo);
+        inicio = null;
+        fin = null;
+    }
+});
+
+            </script>
+        </body>
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+        <body>
+            <canvas id="canvas" width="500" height="500" style="border:2px solid #000"></canvas>
+            <script>
+             var canvas = document.getElementById("canvas")
+var dibujo = canvas.getContext("2d")
+var inicio = null
+var fin = null
+function dot(x,y,dibujo){
+    dibujo.fillRect(x,y,1,1)
+}
+
+function lineaPuntos(inicio,fin,dibujo){
+    let dx = fin.x - inicio.x;
+    let dy = fin.y - inicio.y;
+
+    let m = dy / dx;
+    let b = inicio.y - m * inicio.x;
+
+    let minX = Math.min(inicio.x, fin.x);
+    let maxX = Math.max(inicio.x, fin.x);
+
+    for (let x = minX; x <= maxX; x++) {
+        let y = Math.round(m * x + b);
+        dot(x, y, dibujo);
+        console.log(x, y);
+    }
+}
+canvas.addEventListener("click",function(event){
+    var x = event.clientX - canvas.getBoundingClientRect().left
+    var y = event.clientY - canvas.getBoundingClientRect().top
+    console.log(inicio)
+        
+    console.log(fin)
+    if(inicio === null){
+        inicio = {x: x, y: y}
+       
+    } else{
+        fin={x:x,y:y}
+
+    lineaPuntos(inicio,fin,dibujo);
+
+        inicio = null
+        fin = null
+    }
+});
+
+            </script>
+        </body>
+</html>

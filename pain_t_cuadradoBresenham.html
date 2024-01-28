@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cuadrado</title>
+</head>
+<body>
+  <canvas id="canvas" width="500" height="500" style="border:1px solid #000;"></canvas>
+
+  <script>
+    let points = [];
+    let canvas, ctx;
+
+    function drawSquare(x1, y1, x2, y2) {
+      clearCanvas();
+
+      //superior
+      bresenhamLine(x1, y1, x2, y1);
+
+      //derecho
+      bresenhamLine(x2, y1, x2, y2);
+
+      //inferior
+      bresenhamLine(x2, y2, x1, y2);
+
+      //izquierdo
+      bresenhamLine(x1, y2, x1, y1);
+    }
+
+    function bresenhamLine(x1, y1, x2, y2) {
+      let dx = Math.abs(x2 - x1);
+      let dy = Math.abs(y2 - y1);
+      let sx = (x1 < x2) ? 1 : -1;
+      let sy = (y1 < y2) ? 1 : -1;
+
+      let err = dx - dy;
+
+      while (true) {
+        drawPixel(x1, y1);
+
+        if (x1 === x2 && y1 === y2) {
+          break;
+        }
+
+        let e2 = 2 * err;
+
+        if (e2 > -dy) {
+          err -= dy;
+          x1 += sx;
+        }
+
+        if (e2 < dx) {
+          err += dx;
+          y1 += sy;
+        }
+      }
+    }
+
+    function drawPixel(x, y) {
+      ctx.fillRect(x, y, 1, 1);
+    }
+
+    function clearCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    window.onload = function () {
+      canvas = document.getElementById("canvas");
+      ctx = canvas.getContext("2d");
+
+      canvas.addEventListener("mousedown", function (event) {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+
+        points.push({ x: mouseX, y: mouseY });
+
+        if (points.length === 2) {
+          drawSquare(points[0].x, points[0].y, points[1].x, points[1].y);
+          points = []; 
+        }
+      });
+    };
+  </script>
+</body>
+</html>
