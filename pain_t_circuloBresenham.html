@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="paint_t.css">
+  <title>Cuadrado interactivo con Bresenham</title>
+</head>
+<body>
+  <div class="container">
+  <canvas id="myCanvas" width="800" height="600" style="border:1px solid #000;" ></canvas>
+</div>
+  <script>
+    // Variables para almacenar el estado del dibujo
+    let isDrawing = false;
+    let startX, startY, endX, endY;
+  
+    // Función para dibujar un círculo utilizando el algoritmo de Bresenham
+    function drawCircle(ctx, centerX, centerY, radius) {
+      let x = radius;
+      let y = 0;
+      let decisionOver2 = 1 - x;
+  
+      while (y <= x) {
+        ctx.fillRect(centerX + x, centerY + y, 1, 1);
+        ctx.fillRect(centerX - x, centerY + y, 1, 1);
+        ctx.fillRect(centerX + x, centerY - y, 1, 1);
+        ctx.fillRect(centerX - x, centerY - y, 1, 1);
+        ctx.fillRect(centerX + y, centerY + x, 1, 1);
+        ctx.fillRect(centerX - y, centerY + x, 1, 1);
+        ctx.fillRect(centerX + y, centerY - x, 1, 1);
+        ctx.fillRect(centerX - y, centerY - x, 1, 1);
+  
+        y++;
+        if (decisionOver2 <= 0) {
+          decisionOver2 += 2 * y + 1;
+        } else {
+          x--;
+          decisionOver2 += 2 * (y - x) + 1;
+        }
+      }
+    }
+  
+    // Asignar eventos de mouse para interactuar con el canvas
+    window.addEventListener('load', function () {
+      const canvas = document.getElementById("myCanvas");
+      const ctx = canvas.getContext("2d");
+  
+      canvas.addEventListener("mousedown", function (event) {
+        startX = event.offsetX;
+        startY = event.offsetY;
+        isDrawing = true;
+      });
+  
+      canvas.addEventListener("mousemove", function (event) {
+        if (isDrawing) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height); // Borra el canvas
+          endX = event.offsetX;
+          endY = event.offsetY;
+          const radius = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+          drawCircle(ctx, startX, startY, radius);
+        }
+      });
+  
+      canvas.addEventListener("mouseup", function () {
+        isDrawing = false;
+      });
+    });
+  </script>
+  
+  
+</body>
+</html>

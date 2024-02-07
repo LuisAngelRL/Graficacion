@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="paint_t.css">
+  <title>Polígono interactivo con Bresenham</title>
+  <style>
+    .container {
+      position: relative;
+    }
+
+    #sizeIndicator {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <canvas id="myCanvas" width="800" height="600" style="border:1px solid #000;"></canvas>
+    <div id="sizeIndicator">Lados: 3 - Radio: 0</div>
+  </div>
+  <div class="input-container">
+    <label for="sides">Número de lados:</label>
+    <input type="number" id="sides" name="sides" min="3" max="20" value="3">
+  </div>
+  <script>
+    // Variables para almacenar el estado del dibujo
+    let isDrawing = false;
+    let startX, startY, endX, endY;
+    let sides = 3; // Inicializamos el número de lados del polígono como 3 (un triángulo)
+
+    // Función para dibujar un polígono utilizando el algoritmo de Bresenham
+    function drawPolygon(ctx, startX, startY, endX, endY, sides) {
+      const radius = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+      const angleIncrement = (2 * Math.PI) / sides;
+
+      ctx.beginPath();
+      for (let i = 0; i < sides; i++) {
+        const angle = i * angleIncrement;
+        const x = startX + radius * Math.cos(angle);
+        const y = startY + radius * Math.sin(angle);
+        ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+
+      // Dibujar el radio del polígono
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+
+      // Actualizar el indicador de tamaño
+      document.getElementById("sizeIndicator").innerText = `Lados: ${sides} - Radio: ${Math.round(radius)}`;
+    }
+
+    // Asignar eventos de mouse para interactuar con el canvas
+    window.addEventListener('load', function () {
+      const canvas = document.getElementById("myCanvas");
+      const ctx = canvas.getContext("2d");
+
+      canvas.addEventListener("mousedown", function (event) {
+        startX = event.offsetX;
+        startY = event.offsetY;
+        isDrawing = true;
+      });
+
+      canvas.addEventListener("mousemove", function (event) {
+        if (isDrawing) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height); // Borra el canvas
+          endX = event.offsetX;
+          endY = event.offsetY;
+          drawPolygon(ctx, startX, startY, endX, endY, sides);
+        }
+      });
+
+      canvas.addEventListener("mouseup", function () {
+        isDrawing = false;
+      });
+
+      // Evento para cambiar el número de lados del polígono
+      document.getElementById("sides").addEventListener("change", function(event) {
+        sides = parseInt(event.target.value);
+        if (isDrawing) {
+          drawPolygon(ctx, startX, startY, endX, endY, sides);
+        }
+      });
+    });
+  </script>
+</body>
+</html>
