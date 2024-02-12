@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Elipse interactiva con Bresenham</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .navbar {
+      margin-bottom: 20px;
+    }
+
+    #myCanvas {
+      width: 100%;
+      max-width: 800px;
+      border: 1px solid #000;
+    }
+
+    #sizeIndicator {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+    }
+
+    .nav-link svg {
+      margin-right: 5px;
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <a class="navbar-brand" href="#">Pain_t</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav mr-auto">
+        <li class="nav-item active">
+          <a class="nav-link" href="#"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-dash" viewBox="0 0 16 16"><path d="M0 7.5a.5.5 0 0 1 .5-.5h15a.5.5 0 0 1 0 1H.5a.5.5 0 0 1-.5-.5z"/></svg></a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-record" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14ZM8 3a5 5 0 1 0 0 10A5 5 0 0 0 8 3Z"/></svg></a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-square" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M4 4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4zm1-1V2a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1H5z"/></svg></a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link fill-tool" href="#" id="fillButton">Rellenar Figura</a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <canvas id="myCanvas" width="800" height="600"></canvas>
+  <div id="sizeIndicator">Radio X: 0 - Radio Y: 0</div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const canvas = document.getElementById("myCanvas");
+      const ctx = canvas.getContext("2d");
+      let isDrawing = false; //controlar si se está dibujando o no
+      let isFigureDrawn = false;//controlar si se ha dibujado una figura
+      let isFilling = false; //controlar si se está rellenando la figura
+
+      canvas.addEventListener("mousedown", function (event) {
+        startX = event.offsetX;
+        startY = event.offsetY;
+        isDrawing = true; //alhacer clic, se comienza a dibujar
+      });
+
+      canvas.addEventListener("mousemove", function (event) {
+        if (isDrawing) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          endX = event.offsetX;
+          endY = event.offsetY;
+          const centerX = (startX + endX) / 2;
+          const centerY = (startY + endY) / 2;
+          radiusX = Math.abs(endX - startX) / 2;
+          radiusY = Math.abs(endY - startY) / 2;
+          drawEllipse(ctx, centerX, centerY, radiusX, radiusY);
+        }
+      });
+
+      canvas.addEventListener("mouseup", function () {
+        isDrawing = false; 
+        // al soltar el clic, se detiene el dibujo
+        isFigureDrawn = true;
+         // se establece que se ha dibujado una figura
+      });
+
+        //boton de rellenar figura
+      document.getElementById("fillButton").addEventListener("click", function () {
+        if (isFigureDrawn) {
+          isFilling = true; 
+          // establecer que se está en proceso de rellenar
+        } else {
+          alert("dibuja primero.");
+        }
+      });
+
+      canvas.addEventListener("click", function(event) {
+        if (isFilling) {
+          const x = event.offsetX;
+          const y = event.offsetY;
+          const fillColor = [255, 0, 0, 255]; // rojo
+          floodFill(canvas, ctx, x, y, fillColor);
+          isFilling = false; 
+        }
+      });
+
+  function floodFill(canvas, ctx, startX, startY, fillColor) {
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const width = canvas.width;
+  const height = canvas.height;
+  const stack = [];
+  const targetColor = getPixelColor(imageData, startX, startY);
+
+  if (!isColorMatch(targetColor, fillColor)) {
+    stack.push([startX, startY]);
+  }
+
+  while (stack.length) {
+    const [currentX, currentY] = stack.pop();
+
+    if (currentX >= 0 && currentX < width && currentY >= 0 && currentY < height) {
+      if (isColorMatch(getPixelColor(imageData, currentX, currentY), targetColor)) {
+        fillColorPixel(imageData, currentX, currentY, fillColor);
+        stack.push([currentX + 1, currentY]);
+        stack.push([currentX - 1, currentY]);
+        stack.push([currentX, currentY + 1]);
+        stack.push([currentX, currentY - 1]);
+      }
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+}
+
+function getPixelColor(imageData, x, y) {
+  const index = (y * imageData.width + x) * 4;
+  return [
+    imageData.data[index],
+    imageData.data[index + 1],
+    imageData.data[index + 2],
+    imageData.data[index + 3]
+  ];
+}
+
+function fillColorPixel(imageData, x, y, fillColor) {
+  const index = (y * imageData.width + x) * 4;
+  imageData.data[index] = fillColor[0];
+  imageData.data[index + 1] = fillColor[1];
+  imageData.data[index + 2] = fillColor[2];
+  imageData.data[index + 3] = fillColor[3];
+}
+
+function isColorMatch(color1, color2) {
+  return color1[0] === color2[0] && color1[1] === color2[1] && color1[2] === color2[2] && color1[3] === color2[3];
+}
+
+
+      function drawEllipse(ctx, centerX, centerY, radiusX, radiusY) {
+        ctx.beginPath();
+        for (let angle = 0; angle < 360; angle++) {
+          const radians = angle * Math.PI / 180;
+          const x = centerX + radiusX * Math.cos(radians);
+          const y = centerY + radiusY * Math.sin(radians);
+          if (angle === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
+    });
+  </script>
+</body>
+</html>
