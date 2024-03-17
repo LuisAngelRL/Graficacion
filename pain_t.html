@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Canvas Tools with Layers, Color Picker, and Eraser</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    #canvas-container {
+      position: relative;
+    }
+
+    #canvas {
+      border: 1px solid #ccc;
+    }
+
+    #tool-buttons {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+    }
+
+    #tool-buttons button {
+      margin-right: 5px;
+    }
+
+    #layer-buttons {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+    }
+
+    #layer-buttons button {
+      margin-right: 5px;
+    }
+
+    #color-picker {
+      position: absolute;
+      top: 40px;
+      right: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas-container">
+    <canvas id="canvas" width="800" height="600"></canvas>
+    <div id="tool-buttons">
+      <button id="line-tool">Línea</button>
+      <button id="square-tool">Cuadrado</button>
+      <button id="circle-tool">Círculo</button>
+      <button id="ellipse-tool">Elipse</button>
+      <button id="polygon-tool">Polígono</button>
+      <input type="number" id="sides-input" placeholder="Lados del polígono">
+      <button id="trapecio-tool">Trapecio</button>
+      <button id="eraser-tool">Borrador</button>
+      <button id="select-tool">Seleccionar</button>
+      <button id="rotate-tool">Rotar</button>
+      <button id="move-tool">Mover</button>
+      <button id="increase-tool">Aumentar</button>
+      <button id="decrease-tool">Reducir</button>
+      <div id="save-buttons">
+        <button id="save-png-btn">Guardar como PNG</button>
+        <button id="save-pdf-btn">Guardar como PDF</button>
+      </div>
+      
+
+
+
+
+      <button id="text-tool">Texto</button>
+    </div>
+    <div id="layer-buttons">
+      <button id="add-layer">Agregar Capa</button>
+      <button id="delete-layer">Eliminar Capa</button>
+      <div id="layer-indicator">Capa: 1</div>
+    </div>
+    <div id="color-picker">
+      <input type="color" id="border-color" value="#000000">
+      <input type="color" id="fill-color" value="#ffffff">
+    </div>
+    <div id="undo-redo-buttons">
+        <button id="undo-btn">Deshacer</button>
+        <button id="redo-btn">Rehacer</button>
+      </div>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+
+  <script>
+    document.getElementById("save-png-btn").addEventListener("click", saveAsPNG);
+document.getElementById("save-pdf-btn").addEventListener("click", saveAsPDF);
+
+    let isDrawing = false;
+    let isSelecting = false;
+    let selectedShape = null;
+    let canvas = document.getElementById("canvas");
+    let ctx = canvas.getContext("2d");
+    let shapes = []; // Lista de formas dibujadas
+    let currentTool = null; // Herramienta actualmente seleccionada
+    let layers = []; // Lista de capas
+    let currentLayer = null; // Capa actualmente seleccionada
+    let borderColor = "#000000"; // Color de borde predeterminado
+    let fillColor = "#ffffff"; // Color de relleno predeterminado
+    let undoStack = []; // Pila para deshacer
+    let redoStack = []; // Pila para rehacer
+
+// Variable global para almacenar el círculo seleccionado
+let selectedCircle = null;
+
+// Variable para indicar si estamos moviendo el círculo
+let isMovingCircle = false;
+
+    function redrawCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      layers.forEach(layer => {
+        layer.shapes.forEach(shape => {
+          drawShape(shape);
+        });
+      });
+    }
+
+    function drawShape(shape) {
+      ctx.strokeStyle = shape.borderColor;
+      ctx.fillStyle = shape.fillColor;
+      switch (shape.type) {
+        case "line":
+          drawLine(shape);
+          break;
+        case "square":
+          drawSquare(shape);
+          break;
+        case "circle":
+          drawCircle(shape);
+          break;
+        case "ellipse":
+          drawEllipse(shape);
+          break;
+        case "polygon":
+          drawPolygon(shape);
+          break;
+        case "trapecio":
+          drawTrapecio(shape);
+          break;
+        case "text":
+          drawText(shape);
+          break;
+      }
+    }
+
+    function drawLine(line) {
+      ctx.beginPath();
+      ctx.moveTo(line.startX, line.startY);
+      ctx.lineTo(line.endX, line.endY);
+      ctx.stroke();
+    }
+
+    function drawSquare(square) {
+  ctx.save(); // Guardar el estado actual del contexto
+  ctx.translate(square.startX + square.width / 2, square.startY + square.height / 2); // Mover el origen al centro del cuadrado
+  ctx.rotate(square.angle); // Rotar el lienzo por el ángulo del cuadrado
+  ctx.beginPath();
+  ctx.rect(-square.width / 2, -square.height / 2, square.width, square.height); // Dibujar el cuadrado en el nuevo origen
+  ctx.stroke();
+  ctx.fill();
+  ctx.restore(); // Restaurar el estado del contexto
+}
+
+
+ // Función para dibujar el círculo
+function drawCircle(circle) {
+  ctx.beginPath();
+  ctx.arc(circle.x, circle.y, circle.radius, 0, 2 * Math.PI);
+  ctx.stroke();
+  ctx.fill();
+}
+
+    function drawEllipse(ellipse) {
+      ctx.beginPath();
+      const radiusX = ellipse.radiusX;
+      const radiusY = ellipse.radiusY;
+      const centerX = ellipse.centerX;
+      const centerY = ellipse.centerY;
+      for (let angle = 0; angle < 360; angle++) {
+        const radians = angle * Math.PI / 180;
+        const x = centerX + radiusX * Math.cos(radians);
+        const y = centerY + radiusY * Math.sin(radians);
+        if (angle === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fill();
+    }
+
+    function drawPolygon(polygon) {
+      ctx.beginPath();
+      const angle = Math.PI * 2 / polygon.sides;
+      ctx.moveTo(polygon.x + polygon.radius * Math.cos(0), polygon.y + polygon.radius * Math.sin(0));
+      for (let i = 1; i <= polygon.sides; i++) {
+        ctx.lineTo(polygon.x + polygon.radius * Math.cos(angle * i), polygon.y + polygon.radius * Math.sin(angle * i));
+      }
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fill();
+    }
+
+    function drawTrapecio(trapecio) {
+      ctx.beginPath();
+      const x1 = trapecio.startX;
+      const y1 = trapecio.startY;
+      const x2 = trapecio.endX;
+      const y2 = trapecio.endY;
+      const topWidth = trapecio.topWidth;
+      const bottomWidth = trapecio.bottomWidth;
+      const height = trapecio.height;
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x1 + topWidth, y1);
+      ctx.lineTo(x2 + bottomWidth, y2);
+      ctx.lineTo(x2, y2);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fill();
+    }
+
+    function drawText(text) {
+  console.log("Dibujando texto:", text);
+  ctx.font = text.font;
+  ctx.fillStyle = text.fillColor;
+  ctx.fillText(text.text, text.x, text.y);
+}
+
+
+    function activateTool(tool) {
+      currentTool = tool;
+      isDrawing = false;
+      isSelecting = false;
+      selectedShape = null;
+    }
+
+    function addLayer() {
+      currentLayer = layers.length;
+      layers.push({ shapes: [] });
+      document.getElementById("layer-indicator").textContent = "Capa: " + (currentLayer + 1);
+    }
+
+    function deleteLayer() {
+      if (layers.length === 1) {
+        alert("No puedes eliminar la última capa.");
+        return;
+      }
+      layers.splice(currentLayer, 1);
+      if (currentLayer >= layers.length) {
+        currentLayer = layers.length - 1;
+      }
+      document.getElementById("layer-indicator").textContent = "Capa: " + (currentLayer + 1);
+      redrawCanvas();
+    }
+
+    document.getElementById("line-tool").addEventListener("click", function() {
+      activateTool("line");
+    });
+
+    document.getElementById("square-tool").addEventListener("click", function() {
+      activateTool("square");
+    });
+
+    document.getElementById("circle-tool").addEventListener("click", function() {
+      activateTool("circle");
+    });
+
+    document.getElementById("ellipse-tool").addEventListener("click", function() {
+      activateTool("ellipse");
+    });
+
+    document.getElementById("polygon-tool").addEventListener("click", function() {
+      activateTool("polygon");
+    });
+
+    document.getElementById("trapecio-tool").addEventListener("click", function() {
+      activateTool("trapecio");
+    });
+
+    document.getElementById("eraser-tool").addEventListener("click", function() {
+      activateTool("eraser");
+    });
+
+    document.getElementById("text-tool").addEventListener("click", function() {
+      activateTool("text");
+    });
+
+    document.getElementById("select-tool").addEventListener("click", function() {
+  activateTool("selection");
+});
+
+document.getElementById("rotate-tool").addEventListener("click", function() {
+  rotateSelectedSquare();
+});
+document.getElementById("rotate-tool").addEventListener("click", function() {
+  rotateSelectedEllipse();
+});
+// Escuchar el evento de clic del botón de "Aumentar"
+document.getElementById("increase-tool").addEventListener("click", function() {
+  if (selectedSquare) {
+    selectedSquare.width += 15;
+    selectedSquare.height += 15;
+    redrawCanvas();
+  }
+});
+
+// Escuchar el evento de clic del botón de "Reducir"
+document.getElementById("decrease-tool").addEventListener("click", function() {
+  if (selectedSquare && selectedSquare.width > 15 && selectedSquare.height > 15) {
+    selectedSquare.width -= 15;
+    selectedSquare.height -= 15;
+    redrawCanvas();
+  }
+});
+
+// Escuchar el evento de clic del botón de "Mover"
+document.getElementById("move-tool").addEventListener("click", function() {
+  if (selectedSquare) {
+    isMoving = true; // Activar el modo de mover
+  }
+});
+
+// Escuchar el evento de clic del botón de "Mover"
+document.getElementById("move-tool").addEventListener("click", function() {
+  if (selectedCircle) {
+    isMovingCircle = true; // Activar el modo de mover el círculo
+  }
+});
+
+
+function rotateSelectedSquare() {
+  if (selectedSquare) {
+    selectedSquare.angle += Math.PI / 12; // Rotar aproximadamente 15 grados (en radianes)
+    redrawCanvas(); // Redibujar el lienzo para mostrar el cuadrado rotado
+  }
+}
+
+function rotateSelectedEllipse() {
+  if (selectedEllipse) {
+    selectedEllipse.angle += Math.PI / 12; // Rotar aproximadamente 15 grados (en radianes)
+    redrawCanvas(); // Redibujar el lienzo para mostrar el cuadrado rotado
+  }
+}
+// Escuchar el evento de clic del botón "Aumentar"
+document.getElementById("increase-tool").addEventListener("click", function() {
+  if (selectedCircle) {
+    selectedCircle.radius += 15; // Aumentar el radio del círculo en 15 unidades
+    redrawCanvas(); // Redibujar el lienzo para mostrar el círculo actualizado
+  }
+});
+
+// Escuchar el evento de clic del botón "Disminuir"
+document.getElementById("decrease-tool").addEventListener("click", function() {
+  if (selectedCircle) {
+    selectedCircle.radius -= 15; // Disminuir el radio del círculo en 15 unidades
+    redrawCanvas(); // Redibujar el lienzo para mostrar el círculo actualizado
+  }
+});
+
+
+    canvas.addEventListener('mousedown', function(event) {
+      if (!currentTool) return;
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+
+      if (currentTool === 'eraser') {
+        for (let i = layers[currentLayer].shapes.length - 1; i >= 0; i--) {
+          const shape = layers[currentLayer].shapes[i];
+          if (isPointInsideShape(mouseX, mouseY, shape)) {
+            layers[currentLayer].shapes.splice(i, 1);
+            registerUndo({
+              undo: function() {
+                layers[currentLayer].shapes.splice(i, 0, shape);
+              },
+              redo: function() {
+                layers[currentLayer].shapes.splice(i, 1);
+              }
+            });
+            redrawCanvas();
+            return;
+          }
+        }
+      }
+
+      isDrawing = true;
+      isSelecting = true;
+
+      let newShape;
+      if (currentTool === 'line') {
+        newShape = { startX: mouseX, startY: mouseY, endX: mouseX, endY: mouseY, type: 'line', borderColor, fillColor };
+      } else if (currentTool === 'square') {
+        newShape = { startX: mouseX, startY: mouseY, width: 0, height: 0, angle: 0, type: 'square', borderColor, fillColor };
+      } else if (currentTool === 'circle') {
+        newShape = { x: mouseX, y: mouseY, radius: 0, type: 'circle', borderColor, fillColor };
+      } else if (currentTool === 'ellipse') {
+        newShape = { centerX: mouseX, centerY: mouseY, radiusX: 0, radiusY: 0, type: 'ellipse', borderColor, fillColor };
+      } else if (currentTool === 'polygon') {
+        const sides = parseInt(document.getElementById("sides-input").value);
+        newShape = { x: mouseX, y: mouseY, radius: 0, sides, type: 'polygon', borderColor, fillColor };
+      } else if (currentTool === 'trapecio') {
+        newShape = { startX: mouseX, startY: mouseY, endX: mouseX, endY: mouseY, topWidth: 0, bottomWidth: 0, height: 0, type: 'trapecio', borderColor, fillColor };
+      } else if (currentTool === 'text') {
+        const text = prompt("Ingrese el texto:");
+        if (text !== null) {
+    const fontSize = 20; // Tamaño de fuente predeterminado
+    ctx.font = fontSize + "px Arial";
+    ctx.fillStyle = fillColor;
+    console.log("Dibujando texto:", text, "en posición:", mouseX, mouseY + fontSize);
+    console.log("Posición final de dibujo:", mouseX, mouseY + fontSize);
+    console.log("Tamaño de fuente:", fontSize);
+
+    ctx.fillText(text, mouseX, mouseY + fontSize); // Dibujar el texto en el lienzo
+    newShape = { x: mouseX, y: mouseY, text, font: ctx.font, fillColor: "#000000", type: 'text' };
+  }
+        
+      }
+
+      if (newShape) {
+        layers[currentLayer].shapes.push(newShape);
+        registerUndo({
+          undo: function() {
+            layers[currentLayer].shapes.pop();
+          },
+          redo: function() {
+            layers[currentLayer].shapes.push(newShape);
+          }
+        });
+        redrawCanvas();
+      }
+    });
+
+    canvas.addEventListener('mousemove', function(event) {
+      if (!isDrawing || !currentTool) return;
+      const rect = canvas.getBoundingClientRect();
+      const endX = event.clientX - rect.left;
+      const endY = event.clientY - rect.top;
+
+      const currentShape = layers[currentLayer].shapes[layers[currentLayer].shapes.length - 1];
+      if (currentTool === 'line') {
+        currentShape.endX = endX;
+        currentShape.endY = endY;
+      } else if (currentTool === 'square') {
+        currentShape.width = endX - currentShape.startX;
+        currentShape.height = endY - currentShape.startY;
+      } else if (currentTool === 'circle') {
+        currentShape.radius = Math.sqrt(Math.pow(endX - currentShape.x, 2) + Math.pow(endY - currentShape.y, 2));
+      } else if (currentTool === 'ellipse') {
+        currentShape.radiusX = Math.abs(endX - currentShape.centerX);
+        currentShape.radiusY = Math.abs(endY - currentShape.centerY);
+      } else if (currentTool === 'polygon') {
+        currentShape.radius = Math.sqrt(Math.pow(endX - currentShape.x, 2) + Math.pow(endY - currentShape.y, 2));
+      } else if (currentTool === 'trapecio') {
+        currentShape.endX = endX;
+        currentShape.endY = endY;
+        currentShape.topWidth = Math.abs(endX - currentShape.startX);
+        currentShape.bottomWidth = currentShape.topWidth * 0.6;
+        currentShape.height = Math.abs(endY - currentShape.startY) * 0.5;
+      }
+
+      redrawCanvas();
+    });
+
+    canvas.addEventListener('mouseup', function(event) {
+      isDrawing = false;
+    });
+
+    document.getElementById("add-layer").addEventListener("click", function() {
+      addLayer();
+    });
+
+    document.getElementById("delete-layer").addEventListener("click", function() {
+      deleteLayer();
+    });
+
+    document.getElementById("border-color").addEventListener("change", function(event) {
+      borderColor = event.target.value;
+    });
+
+    document.getElementById("fill-color").addEventListener("change", function(event) {
+      fillColor = event.target.value;
+    });
+
+    addLayer();
+
+    function isPointInsideShape(x, y, shape) {
+      switch (shape.type) {
+        case "line":
+          return isPointInsideLine(x, y, shape);
+        case "square":
+          return isPointInsideSquare(x, y, shape);
+        case "circle":
+          return isPointInsideCircle(x, y, shape);
+        case "ellipse":
+          return isPointInsideEllipse(x, y, shape);
+        case "polygon":
+          return isPointInsidePolygon(x, y, shape);
+        case "trapecio":
+          return isPointInsideTrapecio(x, y, shape);
+      }
+    }
+
+    function isPointInsideLine(x, y, line) {
+      const dx = line.endX - line.startX;
+      const dy = line.endY - line.startY;
+      const distance = Math.abs(dx * (line.startY - y) - (line.startX - x) * dy) / Math.sqrt(dx * dx + dy * dy);
+      return distance < 5;
+    }
+
+    function isPointInsideSquare(x, y, square) {
+  // Rotar el punto según la rotación del cuadrado
+  const rotatedX = Math.cos(-square.angle) * (x - (square.startX + square.width / 2)) - Math.sin(-square.angle) * (y - (square.startY + square.height / 2)) + (square.startX + square.width / 2);
+  const rotatedY = Math.sin(-square.angle) * (x - (square.startX + square.width / 2)) + Math.cos(-square.angle) * (y - (square.startY + square.height / 2)) + (square.startY + square.height / 2);
+  
+  return rotatedX > square.startX && rotatedX < square.startX + square.width &&
+         rotatedY > square.startY && rotatedY < square.startY + square.height;
+}
+
+// Función para verificar si un punto está dentro de un círculo
+function isPointInsideCircle(x, y, circle) {
+  const dx = x - circle.x;
+  const dy = y - circle.y;
+  return dx * dx + dy * dy <= circle.radius * circle.radius;
+}
+
+    function isPointInsideEllipse(x, y, ellipse) {
+      const dx = (x - ellipse.centerX) / ellipse.radiusX;
+      const dy = (y - ellipse.centerY) / ellipse.radiusY;
+      return dx * dx + dy * dy <= 1;
+    }
+
+    function isPointInsidePolygon(x, y, polygon) {
+      let inside = false;
+      const sides = polygon.sides;
+      const radius = polygon.radius;
+      const centerX = polygon.x;
+      const centerY = polygon.y;
+      const angle = Math.PI * 2 / sides;
+      let vertex1X, vertex1Y, vertex2X, vertex2Y;
+
+      for (let i = 0; i < sides; i++) {
+        vertex1X = centerX + radius * Math.cos(angle * i);
+        vertex1Y = centerY + radius * Math.sin(angle * i);
+        vertex2X = centerX + radius * Math.cos(angle * (i + 1));
+        vertex2Y = centerY + radius * Math.sin(angle * (i + 1));
+
+        if ((vertex1Y > y != vertex2Y > y) &&
+          (x < (vertex2X - vertex1X) * (y - vertex1Y) / (vertex2Y - vertex1Y) + vertex1X)) {
+          inside = !inside;
+        }
+      }
+      return inside;
+    }
+
+    function isPointInsideTrapecio(x, y, trapecio) {
+      const topY = trapecio.startY;
+      const bottomY = trapecio.endY;
+      const topX1 = trapecio.startX;
+      const topX2 = trapecio.startX + trapecio.topWidth;
+      const bottomX1 = trapecio.endX;
+      const bottomX2 = trapecio.endX + trapecio.bottomWidth;
+      const slopeTop = (topY - y) / (topX2 - topX1);
+      const slopeBottom = (bottomY - y) / (bottomX2 - bottomX1);
+      const intersectionTop = topX1 + (y - topY) / slopeTop;
+      const intersectionBottom = bottomX1 + (y - bottomY) / slopeBottom;
+      return x >= intersectionTop && x <= intersectionBottom;
+    }
+
+    function registerUndo(action) {
+      undoStack.push(action);
+      redoStack = [];
+      document.getElementById("undo-btn").disabled = false;
+      document.getElementById("redo-btn").disabled = true;
+    }
+
+    document.getElementById("undo-btn").addEventListener("click", function() {
+      if (undoStack.length > 0) {
+        const action = undoStack.pop();
+        action.undo();
+        redoStack.push(action);
+        if (undoStack.length === 0) {
+          this.disabled = true;
+        }
+        document.getElementById("redo-btn").disabled = false;
+        redrawCanvas();
+      }
+    });
+
+    document.getElementById("redo-btn").addEventListener("click", function() {
+      if (redoStack.length > 0) {
+        const action = redoStack.pop();
+        action.redo();
+        undoStack.push(action);
+        if (redoStack.length === 0) {
+          this.disabled = true;
+        }
+        document.getElementById("undo-btn").disabled = false;
+        redrawCanvas();
+      }
+    });
+
+    let selectedSquare = null; // Variable global para almacenar el cuadrado seleccionado
+
+canvas.addEventListener('mousedown', function(event) {
+  if (!currentTool) return;
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = event.clientX - rect.left;
+  const mouseY = event.clientY - rect.top;
+
+  if (currentTool === 'selection') {
+    // Verificar si el clic está dentro de algún cuadrado
+    for (let i = 0; i < layers[currentLayer].shapes.length; i++) {
+      const shape = layers[currentLayer].shapes[i];
+      if (shape.type === 'square' && isPointInsideSquare(mouseX, mouseY, shape)) {
+        selectedSquare = shape;
+        break;
+      }
+    }
+  }
+});
+
+
+// Escuchar el evento de clic en el lienzo mientras estamos en modo de mover
+canvas.addEventListener('click', function(event) {
+  if (isMoving && selectedSquare) {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    // Actualizar la posición del cuadrado seleccionado
+    selectedSquare.startX = mouseX;
+    selectedSquare.startY = mouseY;
+
+    // Desactivar el modo de mover
+    isMoving = false;
+
+    // Redibujar el lienzo para mostrar el cuadrado en su nueva posición
+    redrawCanvas();
+  }
+});
+
+// Función para verificar si un punto está dentro de un cuadrado
+function isPointInsideSquare(x, y, square) {
+  return x > square.startX && x < square.startX + square.width &&
+         y > square.startY && y < square.startY + square.height;
+}
+
+// Escuchar el evento de clic en el lienzo para seleccionar la figura
+canvas.addEventListener('click', function(event) {
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = event.clientX - rect.left;
+  const mouseY = event.clientY - rect.top;
+
+  // Verificar si el clic está dentro de algún cuadrado
+  for (let i = 0; i < layers[currentLayer].shapes.length; i++) {
+    const shape = layers[currentLayer].shapes[i];
+    if (shape.type === 'square' && isPointInsideSquare(mouseX, mouseY, shape)) {
+      selectedSquare = shape;
+      redrawCanvas(); // Redibujar el lienzo para mostrar el cuadrado seleccionado
+      return;
+    }
+  }
+
+  // Si no se hizo clic en un cuadrado, deseleccionar cualquier cuadrado previamente seleccionado
+  selectedSquare = null;
+  redrawCanvas();
+});
+
+let rotating = false;
+let initialAngle = 0;
+
+canvas.addEventListener('mousedown', function(event) {
+  if (currentTool === 'selection') {
+    if (selectedSquare && isPointInsideSquare(mouseX, mouseY, selectedSquare)) {
+      rotating = true;
+      initialAngle = Math.atan2(mouseY - (selectedSquare.startY + selectedSquare.height / 2), mouseX - (selectedSquare.startX + selectedSquare.width / 2)) - selectedSquare.angle;
+    }
+  }
+});
+
+canvas.addEventListener('mousemove', function(event) {
+  if (rotating) {
+    const angle = Math.atan2(mouseY - (selectedSquare.startY + selectedSquare.height / 2), mouseX - (selectedSquare.startX + selectedSquare.width / 2)) - initialAngle;
+    selectedSquare.angle = angle;
+    redrawCanvas();
+  }
+});
+
+canvas.addEventListener('mouseup', function(event) {
+  rotating = false;
+});
+// Escuchar el evento de clic en el lienzo mientras estamos en modo de mover
+canvas.addEventListener('click', function(event) {
+  if (isMovingCircle && selectedCircle) {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    // Actualizar la posición del círculo seleccionado
+    selectedCircle.x = mouseX;
+    selectedCircle.y = mouseY;
+
+    // Desactivar el modo de mover
+    isMovingCircle = false;
+
+    // Redibujar el lienzo para mostrar el círculo en su nueva posición
+    redrawCanvas();
+  }
+});
+
+// Escuchar el evento de clic en el lienzo para seleccionar la figura
+canvas.addEventListener('click', function(event) {
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = event.clientX - rect.left;
+  const mouseY = event.clientY - rect.top;
+
+  // Verificar si el clic está dentro de algún círculo
+  for (let i = 0; i < layers[currentLayer].shapes.length; i++) {
+    const shape = layers[currentLayer].shapes[i];
+    if (shape.type === 'circle' && isPointInsideCircle(mouseX, mouseY, shape)) {
+      selectedCircle = shape;
+      redrawCanvas(); // Redibujar el lienzo para mostrar el círculo seleccionado
+      return;
+    }
+  }
+
+  // Si no se hizo clic en un círculo, deseleccionar cualquier círculo previamente seleccionado
+  selectedCircle = null;
+  redrawCanvas();
+});
+// Escuchar el evento de clic en el lienzo para seleccionar la elipse
+canvas.addEventListener('click', function(event) {
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = event.clientX - rect.left;
+  const mouseY = event.clientY - rect.top;
+
+  // Verificar si el clic está dentro de alguna elipse
+  for (let i = 0; i < layers[currentLayer].shapes.length; i++) {
+    const shape = layers[currentLayer].shapes[i];
+    if (shape.type === 'ellipse' && isPointInsideEllipse(mouseX, mouseY, shape)) {
+      selectedEllipse = shape;
+      redrawCanvas(); // Redibujar el lienzo para mostrar la elipse seleccionada
+      return;
+    }
+  }
+
+  // Si no se hizo clic en una elipse, deseleccionar cualquier elipse previamente seleccionada
+  selectedEllipse = null;
+  redrawCanvas();
+});
+
+// Variable global para almacenar la elipse seleccionada
+let selectedEllipse = null;
+
+// Variable para indicar si estamos en modo de mover la elipse
+let isMovingEllipse = false;
+
+// Escuchar el evento de clic en el botón "Mover"
+document.getElementById("move-tool").addEventListener("click", function() {
+  if (selectedEllipse) {
+    isMovingEllipse = true; // Activar el modo de mover
+  }
+});
+
+// Escuchar el evento de clic en el lienzo mientras estamos en modo de mover
+canvas.addEventListener('click', function(event) {
+  if (isMovingEllipse && selectedEllipse) {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    // Actualizar la posición de la elipse seleccionada
+    selectedEllipse.centerX = mouseX;
+    selectedEllipse.centerY = mouseY;
+
+    // Desactivar el modo de mover
+    isMovingEllipse = false;
+
+    // Redibujar el lienzo para mostrar la elipse en su nueva posición
+    redrawCanvas();
+  }
+});
+
+// Escuchar el evento de clic en el botón de "Rotar"
+document.getElementById("rotate-tool").addEventListener("click", function() {
+  if (selectedEllipse) {
+    rotateSelectedEllipse();
+  }
+});
+
+// Función para rotar la elipse seleccionada
+function rotateSelectedEllipse() {
+  // Incrementar el ángulo de rotación en 15 grados
+  selectedEllipse.rotation += (Math.PI / 12); // 15 grados en radianes
+  // Redibujar el lienzo para mostrar la elipse rotada
+  redrawCanvas();
+}
+
+function saveAsPDF() {
+  const canvas = document.getElementById("canvas");
+  const pdf = new jsPDF();
+  pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0);
+  pdf.save("paint_image.pdf");
+}
+function saveAsPNG() {
+  const canvas = document.getElementById("canvas");
+  const dataURL = canvas.toDataURL("image/png");
+  const link = document.createElement("a");
+  link.href = dataURL;
+  link.download = "paint_image.png";
+  link.click();
+}
+
+
+  </script>
+</body>
+</html>

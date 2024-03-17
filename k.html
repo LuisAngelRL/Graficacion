@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Canvas Tools</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    #canvas-container {
+      position: relative;
+    }
+
+    #canvas {
+      border: 1px solid #ccc;
+      cursor: crosshair;
+    }
+
+    #tool-buttons {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+    }
+
+    #tool-buttons button {
+      margin-right: 5px;
+    }
+
+    .context-menu {
+      position: absolute;
+      background-color: #fff;
+      border: 1px solid #ccc;
+      padding: 5px;
+      display: none;
+    }
+
+    .context-menu ul {
+      list-style-type: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .context-menu ul li {
+      cursor: pointer;
+    }
+
+    .input-container {
+      margin-bottom: 5px;
+    }
+
+  </style>
+</head>
+<body>
+  <div id="canvas-container">
+    <canvas id="canvas" width="800" height="600"></canvas>
+    <div id="tool-buttons">
+      <button id="select-tool">Seleccionar</button>
+      <button id="square-tool">Cuadrado</button>
+      <button id="circle-tool">Círculo</button>
+      <input type="color" id="border-color" value="#000000">
+    </div>
+    <div id="context-menu" class="context-menu">
+      <ul>
+        <li id="move-action">Mover</li>
+        <li id="resize-action">Redimensionar</li>
+        <li id="rotate-action">Rotar</li>
+        <li id="delete-action">Eliminar</li>
+      </ul>
+    </div>
+  </div>
+
+  <div id="resize-controls" style="display: none;">
+    <div class="input-container">
+      <label for="resize-width">Ancho:</label>
+      <input type="number" id="resize-width">
+    </div>
+    <div class="input-container">
+      <label for="resize-height">Alto:</label>
+      <input type="number" id="resize-height">
+    </div>
+    <button id="resize-confirm">Confirmar</button>
+  </div>
+
+  <div id="move-controls" style="display: none;">
+    <div class="input-container">
+      <label for="move-x">Desplazar en X:</label>
+      <input type="number" id="move-x">
+    </div>
+    <div class="input-container">
+      <label for="move-y">Desplazar en Y:</label>
+      <input type="number" id="move-y">
+    </div>
+    <button id="move-confirm">Confirmar</button>
+  </div>
+
+  <div id="rotate-controls" style="display: none;">
+    <div class="input-container">
+      <label for="rotate-angle">Ángulo de rotación:</label>
+      <input type="number" id="rotate-angle">
+    </div>
+    <button id="rotate-confirm">Confirmar</button>
+  </div>
+
+  <script>
+    let canvas = document.getElementById("canvas");
+    let ctx = canvas.getContext("2d");
+    let shapes = []; // Lista de formas dibujadas
+    let selectedShape = null; // Forma seleccionada
+    let isDragging = false;
+    let dragStartX, dragStartY;
+    let contextMenu = document.getElementById("context-menu");
+    let contextMenuVisible = false;
+    let resizeControls = document.getElementById("resize-controls");
+    let moveControls = document.getElementById("move-controls");
+    let rotateControls = document.getElementById("rotate-controls");
+    let selectButton = document.getElementById("select-tool");
+    let isSelecting = false;
+
+    function drawShapes() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      shapes.forEach(shape => {
+        ctx.strokeStyle = shape.borderColor;
+        switch (shape.type) {
+          case "square":
+            drawSquare(shape);
+            break;
+          case "circle":
+            drawCircle(shape);
+            break;
+        }
+        if (shape === selectedShape) {
+          drawSelectionIndicator(shape);
+        }
+      });
+    }
+
+    function drawSquare(square) {
+      ctx.strokeRect(square.x, square.y, square.width, square.height);
+    }
+
+    function drawCircle(circle) {
+      ctx.beginPath();
+      ctx.arc(circle.x, circle.y, circle.radius, 0, 2 * Math.PI);
+      ctx.stroke();
+    }
+
+    function drawSelectionIndicator(shape) {
+      ctx.setLineDash([5, 5]);
+      ctx.strokeStyle = "#FF0000";
+      switch (shape.type) {
+        case "square":
+          drawSquare(shape);
+          break;
+        case "circle":
+          drawCircle(shape);
+          break;
+      }
+      ctx.setLineDash([]);
+      ctx.strokeStyle = shape.borderColor;
+    }
+
+    canvas.addEventListener("mousedown", function(event) {
+      if (isSelecting) {
+        const clickX = event.offsetX;
+        const clickY = event.offsetY;
+        shapes.forEach(shape => {
+          if (shape.type === "square" && clickX >= shape.x && clickX <= shape.x + shape.width && clickY >= shape.y && clickY <= shape.y + shape.height) {
+            selectedShape = shape;
+            drawShapes();
+            showContextMenu(clickX, clickY);
+          }
+          if (shape.type === "circle") {
+            const distance = Math.sqrt(Math.pow(clickX - shape.x, 2) + Math.pow(clickY - shape.y, 2));
+            if (distance <= shape.radius) {
+              selectedShape = shape;
+              drawShapes();
+              showContextMenu(clickX, clickY);
+            }
+          }
+        });
+      }
+      else if (selectedShape) {
+        const clickX = event.offsetX;
+        const clickY = event.offsetY;
+        if (clickX >= selectedShape.x && clickX <= selectedShape.x + selectedShape.width && clickY >= selectedShape.y && clickY <= selectedShape.y + selectedShape.height) {
+          isDragging = true;
+          dragStartX = clickX;
+          dragStartY = clickY;
+        }
+      }
+    });
+
+    canvas.addEventListener("mousemove", function(event) {
+      if (isDragging && selectedShape) {
+        const deltaX = event.offsetX - dragStartX;
+        const deltaY = event.offsetY - dragStartY;
+        selectedShape.x += deltaX;
+        selectedShape.y += deltaY;
+        dragStartX = event.offsetX;
+        dragStartY = event.offsetY;
+        drawShapes();
+      }
+    });
+
+    canvas.addEventListener("mouseup", function(event) {
+      isDragging = false;
+    });
+
+    function showContextMenu(x, y) {
+      contextMenu.style.left = x + "px";
+      contextMenu.style.top = y + "px";
+      contextMenu.style.display = "block";
+      contextMenuVisible = true;
+    }
+
+    function hideContextMenu() {
+      contextMenu.style.display = "none";
+      contextMenuVisible = false;
+    }
+
+    function showResizeControls() {
+      resizeControls.style.display = "block";
+    }
+
+    function hideResizeControls() {
+      resizeControls.style.display = "none";
+    }
+
+    function showMoveControls() {
+      moveControls.style.display = "block";
+    }
+
+    function hideMoveControls() {
+      moveControls.style.display = "none";
+    }
+
+    function showRotateControls() {
+      rotateControls.style.display = "block";
+    }
+
+    function hideRotateControls() {
+      rotateControls.style.display = "none";
+    }
+
+    document.getElementById("select-tool").addEventListener("click", function() {
+      isSelecting = true;
+    });
+
+    document.getElementById("square-tool").addEventListener("click", function() {
+      isSelecting = false;
+      const square = {
+        type: "square",
+        x: 100,
+        y: 100,
+        width: 50,
+        height: 50,
+        borderColor: document.getElementById("border-color").value
+      };
+      shapes.push(square);
+      drawShapes();
+    });
+
+    document.getElementById("circle-tool").addEventListener("click", function() {
+      isSelecting = false;
+      const circle = {
+        type: "circle",
+        x: 200,
+        y: 200,
+        radius: 25,
+        borderColor: document.getElementById("border-color").value
+      };
+      shapes.push(circle);
+      drawShapes();
+    });
+
+    document.getElementById("move-action").addEventListener("click", function() {
+      showMoveControls();
+      hideContextMenu();
+    });
+
+    document.getElementById("move-confirm").addEventListener("click", function() {
+      const moveX = parseInt(document.getElementById("move-x").value);
+      const moveY = parseInt(document.getElementById("move-y").value);
+      if (!isNaN(moveX) && !isNaN(moveY)) {
+        selectedShape.x += moveX;
+        selectedShape.y += moveY;
+        drawShapes();
+        hideMoveControls();
+      }
+    });
+
+    document.getElementById("resize-action").addEventListener("click", function() {
+      showResizeControls();
+      hideContextMenu();
+    });
+
+    document.getElementById("resize-confirm").addEventListener("click", function() {
+      const resizeWidth = parseInt(document.getElementById("resize-width").value);
+      const resizeHeight = parseInt(document.getElementById("resize-height").value);
+      if (!isNaN(resizeWidth) && !isNaN(resizeHeight)) {
+        selectedShape.width = resizeWidth;
+        selectedShape.height = resizeHeight;
+        drawShapes();
+        hideResizeControls();
+      }
+    });
+
+    document.getElementById("rotate-action").addEventListener("click", function() {
+      showRotateControls();
+      hideContextMenu();
+    });
+
+    document.getElementById("rotate-confirm").addEventListener("click", function() {
+      const rotateAngle = parseInt(document.getElementById("rotate-angle").value);
+      if (!isNaN(rotateAngle)) {
+        selectedShape.rotation += rotateAngle;
+        drawShapes();
+        hideRotateControls();
+      }
+    });
+
+    document.getElementById("delete-action").addEventListener("click", function() {
+      shapes = shapes.filter(shape => shape !== selectedShape);
+      selectedShape = null;
+      drawShapes();
+      hideContextMenu();
+    });
+  </script>
+</body>
+</html>
