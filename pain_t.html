@@ -9,40 +9,38 @@
       font-family: Arial, sans-serif;
       margin: 0;
       padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     #canvas-container {
-      position: relative;
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-right: 10px;
     }
 
     #canvas {
-      border: 1px solid #ccc;
+        margin-top: 10%;
+        margin-right: 10%;
+      border: 5px solid #ccc;
+      width: 60%;
+      
+    
+      text-align: center;
     }
 
     #tool-buttons {
-      position: absolute;
-      top: 10px;
-      left: 10px;
+      width: 50%;
+      max-width: 400px;
+      margin-left: 10px;
     }
 
     #tool-buttons button {
-      margin-right: 5px;
-    }
-
-    #layer-buttons {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-    }
-
-    #layer-buttons button {
-      margin-right: 5px;
-    }
-
-    #color-picker {
-      position: absolute;
-      top: 40px;
-      right: 10px;
+      display: block;
+      margin-bottom: 5px;
     }
   </style>
 </head>
@@ -52,41 +50,37 @@
     <div id="tool-buttons">
       <button id="line-tool">Línea</button>
       <button id="square-tool">Cuadrado</button>
+      <button id="rectangle-tool">Rectángulo</button>
       <button id="circle-tool">Círculo</button>
       <button id="ellipse-tool">Elipse</button>
       <button id="polygon-tool">Polígono</button>
       <input type="number" id="sides-input" placeholder="Lados del polígono">
       <button id="trapecio-tool">Trapecio</button>
       <button id="eraser-tool">Borrador</button>
+      <button id="eraser2-tool">Borrador 2</button>
       <button id="select-tool">Seleccionar</button>
       <button id="rotate-tool">Rotar</button>
       <button id="move-tool">Mover</button>
       <button id="increase-tool">Aumentar</button>
       <button id="decrease-tool">Reducir</button>
+      <button id="text-tool">Texto</button>
+      <button id="add-layer">Agregar Capa</button>
+      <button id="delete-layer">Eliminar Capa</button>
+      <button id="pen-tool">Bolígrafo</button>
       <div id="save-buttons">
         <button id="save-png-btn">Guardar como PNG</button>
         <button id="save-pdf-btn">Guardar como PDF</button>
       </div>
-      
-
-
-
-
-      <button id="text-tool">Texto</button>
-    </div>
-    <div id="layer-buttons">
-      <button id="add-layer">Agregar Capa</button>
-      <button id="delete-layer">Eliminar Capa</button>
       <div id="layer-indicator">Capa: 1</div>
-    </div>
-    <div id="color-picker">
-      <input type="color" id="border-color" value="#000000">
-      <input type="color" id="fill-color" value="#ffffff">
-    </div>
-    <div id="undo-redo-buttons">
+      <div id="color-picker">
+        <input type="color" id="border-color" value="#000000">
+        <input type="color" id="fill-color" value="#ffffff">
+      </div>
+      <div id="undo-redo-buttons">
         <button id="undo-btn">Deshacer</button>
         <button id="redo-btn">Rehacer</button>
       </div>
+    </div>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
 
@@ -107,9 +101,15 @@ document.getElementById("save-pdf-btn").addEventListener("click", saveAsPDF);
     let fillColor = "#ffffff"; // Color de relleno predeterminado
     let undoStack = []; // Pila para deshacer
     let redoStack = []; // Pila para rehacer
-
+    let isMoving = null;
+    let isErasing = false;
+    
+let lastX = 0;
+let lastY = 0;
 // Variable global para almacenar el círculo seleccionado
 let selectedCircle = null;
+let selectedRectangle = null
+let isMovingRectangle= null
 
 // Variable para indicar si estamos moviendo el círculo
 let isMovingCircle = false;
@@ -132,6 +132,9 @@ let isMovingCircle = false;
           break;
         case "square":
           drawSquare(shape);
+          break;
+        case "rectangle":
+          drawRectangle(shape);
           break;
         case "circle":
           drawCircle(shape);
@@ -169,9 +172,68 @@ let isMovingCircle = false;
   ctx.restore(); // Restaurar el estado del contexto
 }
 
+function drawRectangle(rectangle) {
+  ctx.save(); // Guardar el estado actual del contexto
+  ctx.translate(rectangle.startX + rectangle.width / 2, rectangle.startY + rectangle.height / 2); // Mover el origen al centro del rectángulo
+  ctx.rotate(rectangle.angle); // Rotar el lienzo por el ángulo del rectángulo
+  ctx.beginPath();
+  ctx.rect(-rectangle.width / 2, -rectangle.height / 2, rectangle.width, rectangle.height); // Dibujar el rectángulo en el nuevo origen
+  ctx.stroke();
+  ctx.fill();
+  ctx.restore(); // Restaurar el estado del contexto
+}
+// Obtener el botón del bolígrafo
+const penToolButton = document.getElementById("pen-tool");
+
+// Escuchar el evento de clic del botón "Bolígrafo" para activar/desactivar el modo de dibujo
+penToolButton.addEventListener("click", function() {
+  // Cambiar el modo a dibujo o desactivarlo si ya está activado
+  isDrawing = !isDrawing;
+  if (isDrawing) {
+    penToolButton.classList.add("active"); // Agregar clase de estilo al botón cuando está activo
+  } else {
+    penToolButton.classList.remove("active"); // Remover la clase de estilo del botón cuando está desactivado
+  }
+});
+
+// Escuchar el evento de clic del ratón en el lienzo para iniciar el dibujo
+canvas.addEventListener('mousedown', function(event) {
+  if (isDrawing) {
+    isDrawing = true;
+    const rect = canvas.getBoundingClientRect();
+    lastX = event.clientX - rect.left;
+    lastY = event.clientY - rect.top;
+  }
+});
+
+// Escuchar el evento de movimiento del ratón en el lienzo para dibujar
+canvas.addEventListener('mousemove', function(event) {
+  if (isDrawing) {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    // Dibujar una línea desde la última posición hasta la actual
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(mouseX, mouseY);
+    ctx.stroke();
+
+    // Actualizar la última posición
+    lastX = mouseX;
+    lastY = mouseY;
+  }
+});
+
+// Escuchar el evento de liberación del botón del ratón para detener el dibujo
+canvas.addEventListener('mouseup', function(event) {
+  isDrawing = false;
+});
 
  // Función para dibujar el círculo
 function drawCircle(circle) {
+    console.log("funcion dibujar circulo")
+
   ctx.beginPath();
   ctx.arc(circle.x, circle.y, circle.radius, 0, 2 * Math.PI);
   ctx.stroke();
@@ -200,16 +262,20 @@ function drawCircle(circle) {
     }
 
     function drawPolygon(polygon) {
-      ctx.beginPath();
-      const angle = Math.PI * 2 / polygon.sides;
-      ctx.moveTo(polygon.x + polygon.radius * Math.cos(0), polygon.y + polygon.radius * Math.sin(0));
-      for (let i = 1; i <= polygon.sides; i++) {
-        ctx.lineTo(polygon.x + polygon.radius * Math.cos(angle * i), polygon.y + polygon.radius * Math.sin(angle * i));
-      }
-      ctx.closePath();
-      ctx.stroke();
-      ctx.fill();
-    }
+  ctx.save(); // Guardar el estado actual del contexto
+  ctx.translate(polygon.x, polygon.y); // Mover el origen al centro del polígono
+  ctx.rotate(polygon.angle); // Rotar el lienzo por el ángulo del polígono
+  ctx.beginPath();
+  const angle = Math.PI * 2 / polygon.sides;
+  ctx.moveTo(polygon.radius * Math.cos(0), polygon.radius * Math.sin(0));
+  for (let i = 1; i <= polygon.sides; i++) {
+    ctx.lineTo(polygon.radius * Math.cos(angle * i), polygon.radius * Math.sin(angle * i));
+  }
+  ctx.closePath();
+  ctx.stroke();
+  ctx.fill();
+  ctx.restore(); // Restaurar el estado del contexto
+}
 
     function drawTrapecio(trapecio) {
       ctx.beginPath();
@@ -286,6 +352,10 @@ function drawCircle(circle) {
     document.getElementById("trapecio-tool").addEventListener("click", function() {
       activateTool("trapecio");
     });
+    document.getElementById("rectangle-tool").addEventListener("click", function() {
+        console.log("dibujando rectangulo")
+  activateTool("rectangle");
+});
 
     document.getElementById("eraser-tool").addEventListener("click", function() {
       activateTool("eraser");
@@ -302,9 +372,86 @@ function drawCircle(circle) {
 document.getElementById("rotate-tool").addEventListener("click", function() {
   rotateSelectedSquare();
 });
-document.getElementById("rotate-tool").addEventListener("click", function() {
-  rotateSelectedEllipse();
+document.getElementById("move-tool").addEventListener("click", function() {
+  if (selectedPolygon) {
+    isMovingPolygon = true; // Activar el modo de mover el polígono
+  }
 });
+canvas.addEventListener('mousedown', function(event) {
+  if (!currentTool) return;
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = event.clientX - rect.left;
+  const mouseY = event.clientY - rect.top;
+
+  if (currentTool === 'selection') {
+    // Verificar si el clic está dentro de algún polígono
+    for (let i = 0; i < layers[currentLayer].shapes.length; i++) {
+      const shape = layers[currentLayer].shapes[i];
+      if (shape.type === 'polygon' && isPointInsidePolygon(mouseX, mouseY, shape)) {
+        selectedPolygon = shape;
+        break;
+      }
+    }
+  }
+});
+// Escuchar el evento de clic del botón "Borrador 2"
+document.getElementById("eraser2-tool").addEventListener("click", function() {
+  // Cambiar el modo a borrador o desactivarlo si ya está activado
+  isErasing = !isErasing;
+});
+
+// Escuchar el evento de movimiento del ratón en el lienzo para borrar píxeles si estamos en modo borrador
+canvas.addEventListener('mousemove', function(event) {
+  if (isErasing) {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    // Borrar el píxel en la posición actual
+    ctx.clearRect(mouseX, mouseY, 10, 10);
+  }
+});
+canvas.addEventListener('click', function(event) {
+  if (isMovingPolygon && selectedPolygon) {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    // Actualizar la posición del polígono seleccionado
+    selectedPolygon.x = mouseX;
+    selectedPolygon.y = mouseY;
+
+    // Desactivar el modo de mover
+    isMovingPolygon = false;
+
+    // Redibujar el lienzo para mostrar el polígono en su nueva posición
+    redrawCanvas();
+  }
+});
+let rotatingPolygon = false;
+let initialAnglePolygon = 0;
+
+canvas.addEventListener('mousedown', function(event) {
+  if (currentTool === 'selection') {
+    if (selectedPolygon && isPointInsidePolygon(mouseX, mouseY, selectedPolygon)) {
+      rotatingPolygon = true;
+      initialAnglePolygon = Math.atan2(mouseY - selectedPolygon.y, mouseX - selectedPolygon.x) - selectedPolygon.angle;
+    }
+  }
+});
+
+canvas.addEventListener('mousemove', function(event) {
+  if (rotatingPolygon) {
+    const anglePolygon = Math.atan2(mouseY - selectedPolygon.y, mouseX - selectedPolygon.x) - initialAnglePolygon;
+    selectedPolygon.angle = anglePolygon;
+    redrawCanvas();
+  }
+});
+
+canvas.addEventListener('mouseup', function(event) {
+  rotatingPolygon = false;
+});
+
 // Escuchar el evento de clic del botón de "Aumentar"
 document.getElementById("increase-tool").addEventListener("click", function() {
   if (selectedSquare) {
@@ -344,13 +491,24 @@ function rotateSelectedSquare() {
     redrawCanvas(); // Redibujar el lienzo para mostrar el cuadrado rotado
   }
 }
-
-function rotateSelectedEllipse() {
-  if (selectedEllipse) {
-    selectedEllipse.angle += Math.PI / 12; // Rotar aproximadamente 15 grados (en radianes)
-    redrawCanvas(); // Redibujar el lienzo para mostrar el cuadrado rotado
+// Escuchar el evento de clic del botón de "Aumentar"
+document.getElementById("increase-tool").addEventListener("click", function() {
+  if (selectedPolygon) {
+    selectedPolygon.radius += 15; // Aumentar el radio del polígono en 15 unidades
+    redrawCanvas(); // Redibujar el lienzo para mostrar el polígono actualizado
   }
-}
+});
+
+// Escuchar el evento de clic del botón de "Reducir"
+document.getElementById("decrease-tool").addEventListener("click", function() {
+  if (selectedPolygon && selectedPolygon.radius > 15) {
+    selectedPolygon.radius -= 15; // Disminuir el radio del polígono en 15 unidades
+    redrawCanvas(); // Redibujar el lienzo para mostrar el polígono actualizado
+  }
+});
+
+
+
 // Escuchar el evento de clic del botón "Aumentar"
 document.getElementById("increase-tool").addEventListener("click", function() {
   if (selectedCircle) {
@@ -364,6 +522,23 @@ document.getElementById("decrease-tool").addEventListener("click", function() {
   if (selectedCircle) {
     selectedCircle.radius -= 15; // Disminuir el radio del círculo en 15 unidades
     redrawCanvas(); // Redibujar el lienzo para mostrar el círculo actualizado
+  }
+});
+// Escuchar el evento de clic del botón de "Aumentar"
+document.getElementById("increase-tool").addEventListener("click", function() {
+  if (selectedRectangle) {
+    selectedRectangle.width += 15;
+    selectedRectangle.height += 15;
+    redrawCanvas();
+  }
+});
+
+// Escuchar el evento de clic del botón de "Reducir"
+document.getElementById("decrease-tool").addEventListener("click", function() {
+  if (selectedRectangle && selectedRectangle.width > 15 && selectedRectangle.height > 15) {
+    selectedRectangle.width -= 15;
+    selectedRectangle.height -= 15;
+    redrawCanvas();
   }
 });
 
@@ -399,12 +574,14 @@ document.getElementById("decrease-tool").addEventListener("click", function() {
       let newShape;
       if (currentTool === 'line') {
         newShape = { startX: mouseX, startY: mouseY, endX: mouseX, endY: mouseY, type: 'line', borderColor, fillColor };
-      } else if (currentTool === 'square') {
+      } else if (currentTool === 'rectangle') {
+         newShape = { startX: mouseX, startY: mouseY, width: 0, height: 0, angle: 0, type: 'rectangle', borderColor, fillColor };
+    } else if (currentTool === 'square') {
         newShape = { startX: mouseX, startY: mouseY, width: 0, height: 0, angle: 0, type: 'square', borderColor, fillColor };
       } else if (currentTool === 'circle') {
         newShape = { x: mouseX, y: mouseY, radius: 0, type: 'circle', borderColor, fillColor };
       } else if (currentTool === 'ellipse') {
-        newShape = { centerX: mouseX, centerY: mouseY, radiusX: 0, radiusY: 0, type: 'ellipse', borderColor, fillColor };
+        newShape = { centerX: mouseX, centerY: mouseY, radiusX: 0, radiusY: 0,angle: 0,width: 0, height: 0, type: 'ellipse', borderColor, fillColor };
       } else if (currentTool === 'polygon') {
         const sides = parseInt(document.getElementById("sides-input").value);
         newShape = { x: mouseX, y: mouseY, radius: 0, sides, type: 'polygon', borderColor, fillColor };
@@ -451,9 +628,27 @@ document.getElementById("decrease-tool").addEventListener("click", function() {
         currentShape.endX = endX;
         currentShape.endY = endY;
       } else if (currentTool === 'square') {
+    const width = endX - currentShape.startX;
+    const height = endY - currentShape.startY;
+    const sideLength = Math.min(Math.abs(width), Math.abs(height)); // Longitud del lado igual a la mínima entre width y height
+
+    if (width < 0 && height < 0) {
+        currentShape.startX = endX + sideLength;
+        currentShape.startY = endY + sideLength;
+    } else if (width < 0) {
+        currentShape.startX = endX + sideLength;
+    } else if (height < 0) {
+        currentShape.startY = endY + sideLength;
+    }
+
+    currentShape.width = sideLength;
+    currentShape.height = sideLength;
+
+
+      } else if (currentTool === 'rectangle') {
         currentShape.width = endX - currentShape.startX;
-        currentShape.height = endY - currentShape.startY;
-      } else if (currentTool === 'circle') {
+         currentShape.height = endY - currentShape.startY;
+    }else if (currentTool === 'circle') {
         currentShape.radius = Math.sqrt(Math.pow(endX - currentShape.x, 2) + Math.pow(endY - currentShape.y, 2));
       } else if (currentTool === 'ellipse') {
         currentShape.radiusX = Math.abs(endX - currentShape.centerX);
@@ -501,6 +696,8 @@ document.getElementById("decrease-tool").addEventListener("click", function() {
           return isPointInsideSquare(x, y, shape);
         case "circle":
           return isPointInsideCircle(x, y, shape);
+          case "rectangle":
+          return isPointInsideRectangle(x, y, shape);
         case "ellipse":
           return isPointInsideEllipse(x, y, shape);
         case "polygon":
@@ -538,6 +735,13 @@ function isPointInsideCircle(x, y, circle) {
       const dy = (y - ellipse.centerY) / ellipse.radiusY;
       return dx * dx + dy * dy <= 1;
     }
+    function isPointInsideRectangle(pointX, pointY, rectangle) {
+    return pointX >= rectangle.startX &&
+           pointX <= rectangle.startX + rectangle.width &&
+           pointY >= rectangle.startY &&
+           pointY <= rectangle.startY + rectangle.height;
+}
+
 
     function isPointInsidePolygon(x, y, polygon) {
       let inside = false;
@@ -759,8 +963,7 @@ canvas.addEventListener('click', function(event) {
   redrawCanvas();
 });
 
-// Variable global para almacenar la elipse seleccionada
-let selectedEllipse = null;
+
 
 // Variable para indicar si estamos en modo de mover la elipse
 let isMovingEllipse = false;
@@ -791,20 +994,20 @@ canvas.addEventListener('click', function(event) {
   }
 });
 
-// Escuchar el evento de clic en el botón de "Rotar"
-document.getElementById("rotate-tool").addEventListener("click", function() {
-  if (selectedEllipse) {
-    rotateSelectedEllipse();
-  }
-});
+// // Escuchar el evento de clic en el botón de "Rotar"
+// document.getElementById("rotate-tool").addEventListener("click", function() {
+//   if (selectedEllipse) {
+//     rotateSelectedEllipse();
+//   }
+// });
 
-// Función para rotar la elipse seleccionada
-function rotateSelectedEllipse() {
-  // Incrementar el ángulo de rotación en 15 grados
-  selectedEllipse.rotation += (Math.PI / 12); // 15 grados en radianes
-  // Redibujar el lienzo para mostrar la elipse rotada
-  redrawCanvas();
-}
+// // Función para rotar la elipse seleccionada
+// function rotateSelectedEllipse() {
+//   // Incrementar el ángulo de rotación en 15 grados
+//   selectedEllipse.rotation += (Math.PI / 12); // 15 grados en radianes
+//   // Redibujar el lienzo para mostrar la elipse rotada
+//   redrawCanvas();
+// }
 
 function saveAsPDF() {
   const canvas = document.getElementById("canvas");
@@ -820,6 +1023,71 @@ function saveAsPNG() {
   link.download = "paint_image.png";
   link.click();
 }
+
+// Escuchar el evento de clic en el lienzo para seleccionar el rectángulo
+canvas.addEventListener('click', function(event) {
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = event.clientX - rect.left;
+  const mouseY = event.clientY - rect.top;
+
+  // Verificar si el clic está dentro de algún rectángulo
+  for (let i = 0; i < layers[currentLayer].shapes.length; i++) {
+    const shape = layers[currentLayer].shapes[i];
+    if (shape.type === 'rectangle' && isPointInsideRectangle(mouseX, mouseY, shape)) {
+      selectedRectangle = shape;
+      redrawCanvas(); // Redibujar el lienzo para mostrar el rectángulo seleccionado
+      return;
+    }
+  }
+  // Si no se hizo clic en un rectángulo, deseleccionar cualquier rectángulo previamente seleccionado
+  selectedRectangle = null;
+  redrawCanvas();
+});
+
+// Función para rotar el rectángulo seleccionado
+function rotateSelectedRectangle() {
+  if (selectedRectangle) {
+    console.log("epa")
+    selectedRectangle.angle += Math.PI / 12; // Rotar aproximadamente 15 grados (en radianes)
+    redrawCanvas(); // Redibujar el lienzo para mostrar el rectángulo rotado
+  }
+}
+
+// Escuchar el evento de clic del botón de "Rotar"
+document.getElementById("rotate-tool").addEventListener("click", function() {
+    console.log("rotando rectangulo")
+  rotateSelectedRectangle();
+});
+
+
+
+
+// Escuchar el evento de clic del botón de "Mover"
+document.getElementById("move-tool").addEventListener("click", function() {
+  if (selectedRectangle) {
+    isMovingRectangle = true; // Activar el modo de mover el rectángulo
+  }
+});
+
+// Escuchar el evento de clic en el lienzo mientras estamos en modo de mover
+canvas.addEventListener('click', function(event) {
+  if (isMovingRectangle && selectedRectangle) {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    // Actualizar la posición del rectángulo seleccionado
+    selectedRectangle.startX = mouseX;
+    selectedRectangle.startY = mouseY;
+
+    // Desactivar el modo de mover
+    isMovingRectangle = false;
+
+    // Redibujar el lienzo para mostrar el rectángulo en su nueva posición
+    redrawCanvas();
+  }
+});
+
 
 
   </script>
